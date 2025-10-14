@@ -6,8 +6,15 @@ How to use:
 TOKEN=<your_token>
 ```
 
-- Run the app:
+- Run the app (watch mode):
 
 ```
-export $(cat .env | xargs) && go run . <pull_request_1> <pull_request_2> ...
+export $(cat .env | xargs) && go run . watch
 ```
+
+- Run the app (cli mode):
+
+```
+export $(cat .env | xargs) && go run . cli <pull_request_1> <pull_request_2> ...
+```
+
