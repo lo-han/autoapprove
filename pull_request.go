@@ -61,7 +61,7 @@ func (g *GithubPullRequest) Approve(client *http.Client) error {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("unexpected status code: %d, body: %s", resp.StatusCode, string(body))
 	}
