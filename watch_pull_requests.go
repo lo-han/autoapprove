@@ -37,7 +37,11 @@ func (p *PullRequestWatch) Watch(client *http.Client) (pullRequests []*GithubPul
 			return nil, fmt.Errorf("error checking if has been approved by me: %w", err)
 		}
 
-		if hasTag || !approvedByMe {
+		if approvedByMe {
+			continue
+		}
+
+		if hasTag {
 			owner, repo, prNumber, err := p.splitLink(resp.Subject.Url)
 			if err != nil {
 				return nil, fmt.Errorf("error splitting link: %w", err)
@@ -126,6 +130,7 @@ func (p *PullRequestWatch) checkIfHasAutoapproveTag(client *http.Client, url str
 
 	for _, label := range response.Labels {
 		if label.Name == autoApproveLabel {
+			fmt.Println("Already approved. Skipping")
 			return true, nil
 		}
 	}
