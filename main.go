@@ -19,14 +19,18 @@ func main() {
 	}
 
 	client := &http.Client{Timeout: 30 * time.Second}
+	hasError := false
 
 	for _, pr := range pullRequests {
 		if err := pr.Approve(client); err != nil {
+			hasError = true
 			fmt.Printf("Error approving PR %s: %v\n", pr.ID(), err)
 		}
 	}
 
-	fmt.Println("PRs approved successfully")
+	if !hasError {
+		fmt.Println("PRs approved successfully")
+	}
 }
 
 func getPullRequestFromCLI() (pullRequests []*GithubPullRequest, err error) {
