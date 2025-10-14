@@ -32,7 +32,12 @@ func (p *PullRequestWatch) Watch(client *http.Client) (pullRequests []*GithubPul
 			return nil, fmt.Errorf("error checking for autoapprove tag: %w", err)
 		}
 
-		if hasTag {
+		approvedByMe, err := p.HasBeenApprovedByMe(client, resp.Subject.Url)
+		if err != nil {
+			return nil, fmt.Errorf("error checking if has been approved by me: %w", err)
+		}
+
+		if hasTag || !approvedByMe {
 			owner, repo, prNumber, err := p.splitLink(resp.Subject.Url)
 			if err != nil {
 				return nil, fmt.Errorf("error splitting link: %w", err)
@@ -42,6 +47,49 @@ func (p *PullRequestWatch) Watch(client *http.Client) (pullRequests []*GithubPul
 	}
 
 	return pullRequests, nil
+}
+
+func (p *PullRequestWatch) HasBeenApprovedByMe(client *http.Client, url string) (approved bool, err error) {
+	url += "/reviews"
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return false, fmt.Errorf("error creating request: %w", err)
+	}
+
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("Authorization", "Bearer "+os.Getenv("TOKEN"))
+	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return false, fmt.Errorf("error making request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return false, fmt.Errorf("unexpected status code: %d, body: %s", resp.StatusCode, string(body))
+	}
+
+	var response []hasBeenApprovedResponse
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return false, fmt.Errorf("error reading hasBeenApprovedResponse body: %w", err)
+	}
+
+	if err := json.Unmarshal(body, &response); err != nil {
+		return false, fmt.Errorf("error unmarshalling hasBeenApprovedResponse: %w", err)
+	}
+
+	for _, review := range response {
+		if review.User.Login == os.Getenv("USER") && review.State == "APPROVED" {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
 
 func (p *PullRequestWatch) checkIfHasAutoapproveTag(client *http.Client, url string) (hasTag bool, err error) {
@@ -69,11 +117,11 @@ func (p *PullRequestWatch) checkIfHasAutoapproveTag(client *http.Client, url str
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return false, fmt.Errorf("error reading watchResponse body: %w", err)
+		return false, fmt.Errorf("error reading readPullRequestResponse body: %w", err)
 	}
 
 	if err := json.Unmarshal(body, &response); err != nil {
-		return false, fmt.Errorf("error unmarshalling watchResponse: %w", err)
+		return false, fmt.Errorf("error unmarshalling readPullRequestResponse: %w", err)
 	}
 
 	for _, label := range response.Labels {
@@ -155,4 +203,13 @@ type watchResponse struct {
 type readPullRequestResponse struct {
 	Id     int64   `json:"id"`
 	Labels []label `json:"labels"`
+}
+
+type user struct {
+	Login string `json:"login"`
+}
+
+type hasBeenApprovedResponse struct {
+	User  user   `json:"user"`
+	State string `json:"state"`
 }
